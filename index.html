@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hostel Maintenance System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        .status-pending { background-color: #FEF3C7; color: #92400E; }
+        .status-resolved { background-color: #DBEAFE; color: #0C2340; }
+        .status-confirmed { background-color: #DCFCE7; color: #166534; }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app"></div>
+
+    <script>
+        // ============================================
+        // STATE MANAGEMENT
+        // ============================================
+        let currentUser = null;
+        let allComplaints = [];
+
+        // Demo users
+        const demoUsers = {
+            'student@university.edu': {
+                role: 'student',
+                name: 'Jane Smith',
+                email: 'student@university.edu',
+                id: 'STU1',
+                hostelId: 'H1'
+            },
+            'warden@university.edu': {
+                role: 'warden',
+                name: 'John Doe',
+                email: 'warden@university.edu',
+                id: 'WAR1',
+                hostelId: 'H1'
+            }
+        };
+
+        // Demo complaints
+        const demoComplaints = [
+            {
+                CId: 'C001',
+                description: 'Water leakage from ceiling in room',
+                Status: 'Pending',
+                date_time: new Date(Date.now() - 2 * 86400000).toISOString(),
+                complaint_type: 'Room',
+                amenity_id: 'R101',
+                SId: 'STU1',
+                SName: 'Jane Smith',
+                Smail: 'student@university.edu'
+            },
+            {
+                CId: 'C002',
+                description: 'Broken tap in washroom, water flowing continuously',
+                Status: 'Resolved',
+                date_time: new Date(Date.now() - 86400000).toISOString(),
+                complaint_type: 'Washroom',
+                amenity_id: 'W1',
+                SId: 'STU1',
+                SName: 'Jane Smith',
+                Smail: 'student@university.edu'
+            },
+            {
+                CId: 'C003',
+                description: 'Water filter not working properly',
+                Status: 'Confirmed',
+                date_time: new Date(Date.now() - 3 * 86400000).toISOString(),
+                complaint_type: 'Filter',
+                amenity_id: 'F1',
+                SId: 'STU1',
+                SName: 'Jane Smith',
+                Smail: 'student@university.edu'
+            }
+        ];
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        function init() {
+            showLoginPage();
+        }
+
+        // ============================================
+        // LOGIN PAGE
+        // ============================================
+        function showLoginPage() {
+            currentUser = null;
+            const html = `
+                <div class="min-h-screen flex items-center justify-center px-4">
+                    <div class="w-full max-w-md">
+                        <div class="glass-effect p-8 rounded-lg">
+                            <div class="text-center mb-8">
+                                <h1 class="text-4xl font-bold text-gray-800 mb-2">Hostel Maintenance</h1>
+                                <p class="text-gray-600 text-lg">Complaint Management System</p>
+                            </div>
+
+                            <div id="errorBox" class="hidden mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded"></div>
+
+                            <div class="space-y-4">
+                                <button onclick="handleDemoLogin()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center gap-2">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                    </svg>
+                                    Demo Login (for testing)
+                                </button>
+
+                                <div class="relative">
+                                    <div class="absolute inset-0 flex items-center">
+                                        <div class="w-full border-t border-gray-300"></div>
+                                    </div>
+                                    <div class="relative flex justify-center text-sm">
+                                        <span class="px-2 bg-white text-gray-500">OR</span>
+                                    </div>
+                                </div>
+
+                                <button onclick="handleGoogleSignIn()" class="w-full bg-white hover:bg-gray-50 border-2 border-gray-300 text-gray-700 font-bold py-3 px-4 rounded-lg transition duration-200 flex items-center justify-center gap-3">
+                                    <svg class="w-5 h-5" viewBox="0 0 24 24">
+                                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                                    </svg>
+                                    Continue with Google
+                                </button>
+                            </div>
+
+                            <div class="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                <p class="text-sm text-gray-700">
+                                    <span class="font-semibold block mb-2">🎯 Demo Accounts:</span>
+                                    <span class="text-xs block">👤 Student: student@university.edu</span>
+                                    <span class="text-xs block">👨‍💼 Warden: warden@university.edu</span>
+                                </p>
+                            </div>
+                        </div>
+
+                        <p class="text-center text-white text-sm mt-8 opacity-80">
+                            For technical support, contact hostel administration
+                        </p>
+                    </div>
+                </div>
+            `;
+            document.getElementById('app').innerHTML = html;
+        }
+
+        // ============================================
+        // AUTHENTICATION HANDLERS
+        // ============================================
+        function handleDemoLogin() {
+            const email = prompt('Enter your email:\n\n1. student@university.edu (Student)\n2. warden@university.edu (Warden)');
+            
+            if (!email) return;
+            
+            const trimmedEmail = email.trim().toLowerCase();
+            
+            if (!demoUsers[trimmedEmail]) {
+                showError('Invalid email. Please use student@university.edu or warden@university.edu');
+                return;
+            }
+
+            currentUser = demoUsers[trimmedEmail];
+            
+            if (currentUser.role === 'student') {
+                showStudentDashboard();
+            } else {
+                showWardenDashboard();
+            }
+        }
+
+        function handleGoogleSignIn() {
+            alert('Google Sign-In requires backend setup (Flask + Google OAuth).\n\nFor now, please use Demo Login to test the system.\n\nThe system is fully functional with demo data!');
+        }
+
+        function showError(message) {
+            const errorBox = document.getElementById('errorBox');
+            if (errorBox) {
+                errorBox.textContent = message;
+                errorBox.classList.remove('hidden');
+                setTimeout(() => {
+                    errorBox.classList.add('hidden');
+                }, 5000);
+            }
+        }
+
+        // ============================================
+        // STUDENT DASHBOARD
+        // ============================================
+        function showStudentDashboard() {
+            const html = `
+                <div class="bg-gray-50 min-h-screen">
+                    <!-- Navigation -->
+                    <nav class="bg-white shadow sticky top-0 z-10">
+                        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                            <div class="flex justify-between items-center h-16">
+                                <h1 class="text-2xl font-bold text-gray-900">Hostel Maintenance System</h1>
+                                <div class="flex items-center gap-4">
+                                    <div class="text-right">
+                                        <p class="text-sm font-medium text-gray-900">${currentUser.name}</p>
+                                        <p class="text-xs text-gray-500">Student</p>
+                                    </div>
+                                    <button onclick="logout()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition">
+                                        Logout
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </nav>
+
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                        <!-- Welcome -->
+                        <div class="mb-8">
+                            <h2 class="text-3xl font-bold text-gray-900 mb-2">Welcome, ${currentUser.name}</h2>
+                            <p class="text-gray-600">File and track maintenance complaints</p>
+                        </div>
+
+                        <!-- Success Message -->
+                        <div id="successMsg" class="hidden mb-6 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
+                            <strong>✓ Success!</strong> <span id="successText"></span>
+                        </div>
+
+                        <!-- File Complaint Form -->
+                        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                            <h3 class="text-2xl font-bold text-gray-900 mb-6">📝 File a New Complaint</h3>
+                            
+                            <form onsubmit="fileComplaint(event)" class="space-y-4">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Complaint Type *</label>
+                                        <select id="complaintType" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                            <option value="">Select Type...</option>
+                                            <option value="Room">Room</option>
+                                            <option value="Washroom">Washroom</option>
+                                            <option value="Filter">Water Filter</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">Amenity ID *</label>
+                                        <input type="text" id="amenityId" placeholder="e.g., R101, W2, F3" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Description *</label>
+                                    <textarea id="description" rows="4" placeholder="Describe the issue in detail..." required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"></textarea>
+                                </div>
+
+                                <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition">
+                                    Submit Complaint
+                                </button>
+                            </form>
+                        </div>
+
+                        <!-- My Complaints -->
+                        <div class="bg-white rounded-lg shadow-md p-6">
+                            <h3 class="text-2xl font-bold text-gray-900 mb-6">📋 My Complaints</h3>
+                            
+                            <div id="complaintsList" class="space-y-4">
+                                <!-- Will be populated -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('app').innerHTML = html;
+            loadStudentComplaints();
+        }
+
+        function fileComplaint(e) {
+            e.preventDefault();
+            
+            const complaintType = document.getElementById('complaintType').value;
+            const amenityId = document.getElementById('amenityId').value;
+            const description = document.getElementById('description').value;
+
+            if (!complaintType || !amenityId || !description) {
+                alert('Please fill all fields');
+                return;
+            }
+
+            const newComplaint = {
+                CId: 'C' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+                description: description,
+                Status: 'Pending',
+                date_time: new Date().toISOString(),
+                complaint_type: complaintType,
+                amenity_id: amenityId,
+                SId: currentUser.id,
+                SName: currentUser.name,
+                Smail: currentUser.email
+            };
+
+            demoComplaints.push(newComplaint);
+
+            document.getElementById('successText').textContent = `Complaint filed successfully! ID: ${newComplaint.CId}`;
+            document.getElementById('successMsg').classList.remove('hidden');
+
+            document.getElementById('complaintType').value = '';
+            document.getElementById('amenityId').value = '';
+            document.getElementById('description').value = '';
+
+            setTimeout(() => {
+                document.getElementById('successMsg').classList.add('hidden');
+            }, 4000);
+
+            loadStudentComplaints();
+        }
+
+        function loadStudentComplaints() {
+            const studentComplaints = demoComplaints.filter(c => c.SId === currentUser.id);
+            const list = document.getElementById('complaintsList');
+
+            if (studentComplaints.length === 0) {
+                list.innerHTML = '<p class="text-center text-gray-500 py-8">No complaints filed yet</p>';
+                return;
+            }
+
+            list.innerHTML = studentComplaints.map(c => `
+                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-lg transition">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <h4 class="font-semibold text-gray-900">Complaint #${c.CId}</h4>
+                            <p class="text-sm text-gray-600">${c.complaint_type} - ${c.amenity_id}</p>
+                        </div>
+                        <span class="status-badge status-${c.Status.toLowerCase()}">${c.Status}</span>
+                    </div>
+                    <p class="text-gray-700 mb-3">${c.description}</p>
+                    <div class="flex justify-between items-center text-sm text-gray-500">
+                        <span>${new Date(c.date_time).toLocaleString()}</span>
+                        ${c.Status === 'Resolved' ? `<button onclick="confirmResolution('${c.CId}')" class="text-green-600 hover:text-green-800 font-semibold">✓ Confirm Resolution</button>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function confirmResolution(complaintId) {
+            if (confirm('Confirm that the issue has been resolved?')) {
+                const complaint = demoComplaints.find(c => c.CId === complaintId);
+                if (complaint) {
+                    complaint.Status = 'Confirmed';
+                    document.getElementById('successText').textContent = 'Resolution confirmed successfully!';
+                    document.getElementById('successMsg').classList.remove('hidden');
+                    setTimeout(() => {
+                        document.getElementById('successMsg').classList.add('hidden');
+                    }, 4000);
+                    loadStudentComplaints();
+                }
+            }
+        }
+
+        // ============================================
+        // WARDEN DASHBOARD
+        // ============================================
+        function showWardenDashboard() {
+            const html = `
+                <div class="bg-gray-50 min-h-screen">
+                    <!-- Navigation -->
+                    <nav class="bg-white shadow sticky top-0 z-10">
+                        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                            <div class="flex justify-between items-center h-16">
+                                <h1 class="text-2xl font-bold text-gray-900">Hostel Maintenance System</h1>
+                                <div class="flex items-center gap-4">
+                                    <div class="text-right">
+                                        <p class="text-sm font-medium text-gray-900">${currentUser.name}</p>
+                                        <p class="text-xs text-gray-500">Warden</p>
+                                    </div>
+                                    <button onclick="logout()" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded transition">
+                                        Logout
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </nav>
+
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                        <!-- Welcome -->
+                        <div class="mb-8">
+                            <h2 class="text-3xl font-bold text-gray-900 mb-2">Welcome, ${currentUser.name}</h2>
+                            <p class="text-gray-600">Manage and resolve maintenance complaints</p>
+                        </div>
+
+                        <!-- Success Message -->
+                        <div id="successMsg" class="hidden mb-6 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
+                            <strong>✓ Success!</strong> <span id="successText"></span>
+                        </div>
+
+                        <!-- Statistics -->
+                        <div id="statsContainer" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8"></div>
+
+                        <!-- Filters -->
+                        <div class="bg-white rounded-lg shadow-md p-4 mb-8">
+                            <div class="flex gap-4 items-end flex-wrap">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Filter by Status</label>
+                                    <select id="statusFilter" onchange="filterComplaints()" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500">
+                                        <option value="">All Statuses</option>
+                                        <option value="Pending">Pending</option>
+                                        <option value="Resolved">Resolved</option>
+                                        <option value="Confirmed">Confirmed</option>
+                                    </select>
+                                </div>
+                                <button onclick="loadWardenComplaints()" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded transition">
+                                    🔄 Refresh
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Complaints -->
+                        <div class="bg-white rounded-lg shadow-md p-6">
+                            <h3 class="text-2xl font-bold text-gray-900 mb-6">📋 All Complaints</h3>
+                            <div id="complaintsList" class="space-y-4"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('app').innerHTML = html;
+            loadWardenData();
+        }
+
+        function loadWardenData() {
+            loadWardenStats();
+            loadWardenComplaints();
+        }
+
+        function loadWardenStats() {
+            const total = demoComplaints.length;
+            const pending = demoComplaints.filter(c => c.Status === 'Pending').length;
+            const resolved = demoComplaints.filter(c => c.Status === 'Resolved').length;
+            const confirmed = demoComplaints.filter(c => c.Status === 'Confirmed').length;
+
+            const statsContainer = document.getElementById('statsContainer');
+            if (!statsContainer) return;
+
+            statsContainer.innerHTML = `
+                <div class="stat-card rounded-lg shadow-md p-6">
+                    <p class="text-purple-100 text-sm mb-2">📊 Total Complaints</p>
+                    <p class="text-4xl font-bold">${total}</p>
+                </div>
+                <div class="bg-yellow-100 rounded-lg shadow-md p-6 border-l-4 border-yellow-500">
+                    <p class="text-yellow-800 text-sm mb-2 font-medium">⏳ Pending</p>
+                    <p class="text-4xl font-bold text-yellow-900">${pending}</p>
+                </div>
+                <div class="bg-blue-100 rounded-lg shadow-md p-6 border-l-4 border-blue-500">
+                    <p class="text-blue-800 text-sm mb-2 font-medium">✓ Resolved</p>
+                    <p class="text-4xl font-bold text-blue-900">${resolved}</p>
+                </div>
+                <div class="bg-green-100 rounded-lg shadow-md p-6 border-l-4 border-green-500">
+                    <p class="text-green-800 text-sm mb-2 font-medium">✅ Confirmed</p>
+                    <p class="text-4xl font-bold text-green-900">${confirmed}</p>
+                </div>
+            `;
+        }
+
+        function loadWardenComplaints() {
+            allComplaints = [...demoComplaints];
+            filterComplaints();
+        }
+
+        function filterComplaints() {
+            const filter = document.getElementById('statusFilter')?.value || '';
+            const filtered = filter ? allComplaints.filter(c => c.Status === filter) : allComplaints;
+            const list = document.getElementById('complaintsList');
+
+            if (filtered.length === 0) {
+                list.innerHTML = '<p class="text-center text-gray-500 py-8">No complaints found</p>';
+                return;
+            }
+
+            list.innerHTML = filtered.map(c => `
+                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-lg transition">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <h4 class="font-semibold text-gray-900">Complaint #${c.CId}</h4>
+                            <p class="text-sm text-gray-600">From: <strong>${c.SName}</strong> (${c.Smail})</p>
+                            <p class="text-sm text-gray-600">${c.complaint_type} - ${c.amenity_id}</p>
+                        </div>
+                        <span class="status-badge status-${c.Status.toLowerCase()}">${c.Status}</span>
+                    </div>
+                    <p class="text-gray-700 mb-3">${c.description}</p>
+                    <div class="flex justify-between items-center text-sm text-gray-500">
+                        <span>${new Date(c.date_time).toLocaleString()}</span>
+                        ${c.Status === 'Pending' ? `<button onclick="markResolved('${c.CId}')" class="text-purple-600 hover:text-purple-800 font-semibold">Mark as Resolved ✓</button>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function markResolved(complaintId) {
+            if (confirm('Mark this complaint as resolved?')) {
+                const complaint = demoComplaints.find(c => c.CId === complaintId);
+                if (complaint) {
+                    complaint.Status = 'Resolved';
+                    document.getElementById('successText').textContent = 'Complaint marked as resolved. Waiting for student confirmation...';
+                    document.getElementById('successMsg').classList.remove('hidden');
+                    setTimeout(() => {
+                        document.getElementById('successMsg').classList.add('hidden');
+                    }, 4000);
+                    loadWardenData();
+                }
+            }
+        }
+
+        // ============================================
+        // GENERAL FUNCTIONS
+        // ============================================
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                currentUser = null;
+                allComplaints = [];
+                showLoginPage();
+            }
+        }
+
+        // ============================================
+        // START APPLICATION
+        // ============================================
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

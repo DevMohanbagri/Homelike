@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hostel Maintenance System - Firebase Login</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        .firebase-btn {
+            background: linear-gradient(135deg, #FBBC04 0%, #F57C00 100%);
+            transition: all 0.3s ease;
+        }
+        .firebase-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(251, 188, 4, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="w-full max-w-md">
+        <div class="glass-effect p-8">
+            <div class="text-center mb-8">
+                <h1 class="text-4xl font-bold text-gray-800 mb-2">Hostel Maintenance</h1>
+                <p class="text-gray-600 text-lg">System for Complaint Management</p>
+            </div>
+
+            <div id="loadingSpinner" class="hidden mb-6 text-center">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                <p class="text-gray-600 mt-2">Authenticating with Firebase...</p>
+            </div>
+
+            <div id="errorMessage" class="hidden mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded"></div>
+
+            <div id="loginContent">
+                <p class="text-gray-600 text-center mb-6 text-sm">Sign in with your institutional email using Firebase</p>
+                
+                <!-- Firebase UI Container -->
+                <div id="firebaseui-auth-container" class="mb-4"></div>
+
+                <div class="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <p class="text-sm text-gray-700">
+                        <span class="font-semibold">ℹ️ System Information:</span><br>
+                        <span class="text-xs">This system uses Firebase Authentication for secure login</span><br>
+                        <span class="text-xs">Please ensure your email is registered with the administration</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <p class="text-center text-white text-sm mt-6 opacity-80">
+            For technical support, contact the hostel administration office
+        </p>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.0.0/firebase-auth.js"></script>
+    <script src="https://cdn.firebase.com/libs/firebaseui/6.1.0/firebaseui.js"></script>
+    <link type="text/css" rel="stylesheet" href="https://cdn.firebase.com/libs/firebaseui/6.1.0/firebaseui.css" />
+
+    <script>
+        // Firebase Configuration (injected from Flask)
+        const firebaseConfig = JSON.parse('{{ firebase_config | tojson | safe }}');
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+
+        // Get the auth reference
+        const auth = firebase.auth();
+
+        // FirebaseUI configuration
+        const uiConfig = {
+            signInSuccessUrl: '{{ url_for("dashboard") }}',
+            signInOptions: [
+                {
+                    provider: firebase.auth.EmailAuthProvider.PROVIDER_ID,
+                    requireDisplayName: true
+                },
+                firebase.auth.GoogleAuthProvider.PROVIDER_ID,
+            ],
+            callbacks: {
+                signInSuccessWithAuthResult: function(authResult, redirectUrl) {
+                    // User successfully signed in with Firebase
+                    const user = authResult.user;
+                    
+                    // Get the ID token
+                    user.getIdToken().then(idToken => {
+                        // Send token to backend for verification and role assignment
+                        fetch('/api/auth/firebase', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                idToken: idToken
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                // Redirect to dashboard
+                                window.location.href = data.redirect;
+                            } else {
+                                showError(data.error || 'Authentication failed');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            showError('An error occurred during authentication');
+                        });
+                    });
+                    return false; // Don't automatically redirect - we handle it above
+                },
+                uiShown: function() {
+                    // The FirebaseUI widget is rendered.
+                    document.getElementById('loadingSpinner').classList.add('hidden');
+                }
+            }
+        };
+
+        // Initialize FirebaseUI Widget
+        const ui = new firebaseui.auth.AuthUI(auth);
+        ui.start('#firebaseui-auth-container', uiConfig);
+
+        // Error display function
+        function showError(message) {
+            const errorBox = document.getElementById('errorMessage');
+            errorBox.textContent = message;
+            errorBox.classList.remove('hidden');
+            setTimeout(() => {
+                errorBox.classList.add('hidden');
+            }, 5000);
+        }
+
+        // Monitor auth state
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                // User is signed in
+                console.log('User signed in:', user.email);
+                document.getElementById('loadingSpinner').classList.remove('hidden');
+                document.getElementById('loginContent').classList.add('hidden');
+            } else {
+                // User is signed out
+                console.log('User signed out');
+            }
+        });
+    </script>
+</body>
+</html>

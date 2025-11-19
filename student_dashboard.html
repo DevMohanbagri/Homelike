@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard - Hostel Maintenance</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        .status-pending {
+            background-color: #FEF3C7;
+            color: #92400E;
+        }
+        .status-resolved {
+            background-color: #DBEAFE;
+            color: #0C2340;
+        }
+        .status-confirmed {
+            background-color: #DCFCE7;
+            color: #166534;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-white shadow">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <h1 class="text-xl font-bold text-gray-900">Hostel Maintenance System</h1>
+                </div>
+                <div class="flex items-center gap-4">
+                    <img src="{{ user.picture }}" alt="User" class="w-8 h-8 rounded-full">
+                    <div class="text-right">
+                        <p class="text-sm font-medium text-gray-900">{{ user.name }}</p>
+                        <p class="text-xs text-gray-500">Student</p>
+                    </div>
+                    <a href="/logout" class="text-sm text-red-600 hover:text-red-800">Logout</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Welcome Section -->
+        <div class="mb-8">
+            <h2 class="text-3xl font-bold text-gray-900 mb-2">Welcome, {{ user.name }}</h2>
+            <p class="text-gray-600">File and track maintenance complaints for your hostel</p>
+        </div>
+
+        <!-- File Complaint Section -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h3 class="text-2xl font-bold text-gray-900 mb-6">File a New Complaint</h3>
+            
+            <div id="successMessage" class="hidden mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded flex items-center gap-3">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                <span id="successText">Complaint filed successfully!</span>
+            </div>
+
+            <div id="errorMessage" class="hidden mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded flex items-center gap-3">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg>
+                <span id="errorText">An error occurred</span>
+            </div>
+
+            <form id="complaintForm" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="complaintType" class="block text-sm font-medium text-gray-700 mb-2">Complaint Type</label>
+                        <select id="complaintType" name="complaint_type" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" required>
+                            <option value="">Select Type...</option>
+                            <option value="Room">Room</option>
+                            <option value="Washroom">Washroom</option>
+                            <option value="Filter">Water Filter</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="amenityId" class="block text-sm font-medium text-gray-700 mb-2">Amenity ID</label>
+                        <input type="text" id="amenityId" name="amenity_id" placeholder="e.g., R101, W2, F3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" required>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="description" class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                    <textarea id="description" name="description" rows="4" placeholder="Describe the issue in detail..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" required></textarea>
+                </div>
+
+                <button type="submit" id="submitBtn" class="w-full bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-purple-700 transition duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                    Submit Complaint
+                </button>
+            </form>
+        </div>
+
+        <!-- My Complaints Section -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-2xl font-bold text-gray-900 mb-6">My Complaints</h3>
+            
+            <div id="loadingComplaints" class="text-center py-8">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                <p class="text-gray-600 mt-2">Loading complaints...</p>
+            </div>
+
+            <div id="complaintsContainer" class="hidden space-y-4">
+                <!-- Complaints will be loaded here -->
+            </div>
+
+            <div id="noComplaints" class="hidden text-center py-8 text-gray-500">
+                <p>You haven't filed any complaints yet.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        const complaintForm = document.getElementById('complaintForm');
+        const successMessage = document.getElementById('successMessage');
+        const errorMessage = document.getElementById('errorMessage');
+        const successText = document.getElementById('successText');
+        const errorText = document.getElementById('errorText');
+        const submitBtn = document.getElementById('submitBtn');
+        const complaintsContainer = document.getElementById('complaintsContainer');
+        const loadingComplaints = document.getElementById('loadingComplaints');
+        const noComplaints = document.getElementById('noComplaints');
+
+        // Handle form submission
+        complaintForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            successMessage.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+            submitBtn.disabled = true;
+
+            const formData = new FormData(complaintForm);
+            const data = {
+                description: formData.get('description'),
+                complaint_type: formData.get('complaint_type'),
+                amenity_id: formData.get('amenity_id')
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/student/file-complaint`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    successText.textContent = `Complaint filed successfully! ID: ${result.complaint_id}`;
+                    successMessage.classList.remove('hidden');
+                    complaintForm.reset();
+                    loadComplaints();
+                } else {
+                    errorText.textContent = result.error || 'Failed to file complaint';
+                    errorMessage.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                errorText.textContent = 'An error occurred while filing the complaint';
+                errorMessage.classList.remove('hidden');
+            } finally {
+                submitBtn.disabled = false;
+            }
+        });
+
+        // Load complaints
+        async function loadComplaints() {
+            try {
+                const response = await fetch(`${API_BASE}/student/complaints`);
+                const result = await response.json();
+
+                loadingComplaints.classList.add('hidden');
+
+                if (result.success && result.complaints.length > 0) {
+                    complaintsContainer.innerHTML = result.complaints.map(complaint => `
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <div class="flex justify-between items-start mb-3">
+                                <div>
+                                    <h4 class="font-semibold text-gray-900">Complaint #${complaint.CId}</h4>
+                                    <p class="text-sm text-gray-600">${complaint.complaint_type} - ${complaint.amenity_id}</p>
+                                </div>
+                                <span class="status-badge status-${complaint.Status.toLowerCase()}">${complaint.Status}</span>
+                            </div>
+                            <p class="text-gray-700 mb-3">${complaint.description}</p>
+                            <div class="flex justify-between items-center text-sm text-gray-500">
+                                <span>${new Date(complaint.date_time).toLocaleString()}</span>
+                                ${complaint.Status === 'Resolved' ? `
+                                    <button onclick="confirmResolution('${complaint.CId}')" class="text-green-600 hover:text-green-800 font-semibold">
+                                        Confirm Resolution
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `).join('');
+                    complaintsContainer.classList.remove('hidden');
+                } else {
+                    noComplaints.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Error loading complaints:', error);
+                loadingComplaints.innerHTML = '<p class="text-red-600">Failed to load complaints</p>';
+            }
+        }
+
+        // Confirm resolution
+        async function confirmResolution(complaintId) {
+            if (confirm('Are you sure you want to confirm this resolution?')) {
+                try {
+                    const response = await fetch(`${API_BASE}/student/confirm-resolution/${complaintId}`, {
+                        method: 'POST'
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        successText.textContent = 'Resolution confirmed successfully!';
+                        successMessage.classList.remove('hidden');
+                        loadComplaints();
+                    } else {
+                        errorText.textContent = result.error || 'Failed to confirm resolution';
+                        errorMessage.classList.remove('hidden');
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    errorText.textContent = 'An error occurred';
+                    errorMessage.classList.remove('hidden');
+                }
+            }
+        }
+
+        // Load complaints on page load
+        loadComplaints();
+    </script>
+</body>
+</html>
