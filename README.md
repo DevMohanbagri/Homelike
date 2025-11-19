@@ -133,9 +133,17 @@ pip install -r requirements_firebase.txt
 ---
 
 
-NOTE - To quick run the application, just double click index.html file.
+NOTE - To quickly run the application, just double-click the index.html file.
 
-I am still working on making it work with firebase
+I am still working on making it work with Firebase.
+
+
+
+
+
+
+
+
 ## Firebase Setup
 
 ### Step 1: Create Firebase Project
