@@ -110,8 +110,7 @@ sudo mysql_secure_installation
 
 ### 1. Clone Repository
 ```bash
-git clone https://github.com/yourusername/hostel-maintenance-system.git
-cd hostel-maintenance-system
+git clone https://github.com/DevMohanbagri/Homelike
 ```
 
 ### 2. Create Virtual Environment
